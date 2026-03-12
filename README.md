@@ -1,2 +1,5 @@
 # STAT571B-StudyNoiseLevels
 Full design, data collection, and analysis investigating the noise levels of different study locations
+
+
+Noise levels in different study locations affects student experiences. In relation to study locations on the University of Arizona campus we would like to address the following: 1) Which study location is the most comfortable in terms of noise and distraction?, 2) How does the expected noise of each location differ during the morning and afternoon?, and 3) Does the expected noise for each location change based on day of the week (beginning, middle, end)? To address these key questions, we will perform a Full Factorial experimental design, fit an ANOVA model, create interaction plots and perform formal tests with Tukey’s test for additivity, check model assumptions with model diagnostics and compute Tukey-adjusted confidence intervals to make recommendations. We subsequently came to the finding that the Common Room is the quietest of all study locations, while the Student Union is the loudest. We also concluded the morning is generally quieter than the afternoon across all locations.
