@@ -1,0 +1,231 @@
+---
+title: "Stat 571B Appendix"
+author: "Group 2"
+date: "2025-04-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Section 1: Importing Data
+
+```{r}
+#-------------------------------------------
+# Load data & Convert factors as categorical
+#-------------------------------------------
+
+# Data Import (may need to change based on where you saved the csv)
+study <- read.csv("study.csv")
+
+# Setting factors
+study$Person <- as.factor(study$Person)
+study$Day <- as.factor(study$Day)
+study$Time <- as.factor(study$Time)
+study$Replicate <- as.factor(study$Replicate)
+study$Location <- as.factor(study$Location)
+
+head(study)
+```
+  
+## Section 2: Fit ANOVA model
+
+```{r}
+#-----------------------------------------------------
+# Fitting into ANOVA full factorial model
+#-----------------------------------------------------
+
+library(lmerTest)
+
+# Score as response
+score_model <- lmer(Score ~ Day * Time * Location + (1 | Person), data = study)
+anova(score_model)
+
+```
+
+The three-way interaction Day:Time:Location has a $P$-value $0.79327 \geq 0.05$, therefore, this interaction has no significant effect on the response with $0.05$ significance level. We can drop the three-way interaction term and fit a second-order model. 
+
+
+```{r}
+#-----------------------------------------------------
+# Fitting into a second order ANOVA model
+#-----------------------------------------------------
+
+library(lmerTest)
+
+# Score as response
+score_model_2 <- lmer(Score ~ (Day + Time + Location)^2 + (1 | Person), data = study)
+anova(score_model_2)
+```
+
+From the output above, neither the factor 'Day' or its interaction terms are significant and therefore we can drop the factor 'Day'. Now we'll fit a second order but reduced model.
+
+
+```{r}
+#---------------------------------------------------
+# Fitting into a second order reduced ANOVA model
+#---------------------------------------------------
+
+score_model_red <- lmer(Score ~ Time*Location + (1 | Person), data = study)
+anova(score_model_red)
+```
+
+From this reduced model all factors, i.e., Time, Location and their interactions are statistically significant in terms of having effects on the response.
+
+
+## Section 3: Interaction Plot and Formal Test with Tukey's test for additivity
+
+```{r}
+
+#-----------------------------------------------------
+# Appendix Figure 1 (Fig. A1)
+#-----------------------------------------------------
+
+library(ggplot2)
+library(emmeans)
+
+# Estimated marginal means
+emm <- emmeans(score_model_red, ~ Time * Location)
+emm_df <- as.data.frame(emm)
+
+# Plot
+ggplot(emm_df, aes(x = Location, y = emmean, color = Time, group = Time)) +
+  
+# Raw data jittered (from full dataset)
+geom_jitter(data = study, aes(x = Location, y = Score, color = Time),
+            width = 0.2, alpha = 0.3, inherit.aes = FALSE) +
+
+# Estimated means with error bars
+geom_point(size = 3, position = position_dodge(0.2)) +
+geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+            width = 0.2, position = position_dodge(0.2)) +
+geom_line(position = position_dodge(0.2)) +
+
+# Annotate the best location
+annotate("rect", xmin = 0.5, xmax = 1.5, ymin = -Inf, ymax = Inf,
+          alpha = 0.05, fill = "green") +
+annotate("text", x = 1, y = max(emm_df$emmean) + 0.5,
+          label = "Best: Common Room", color = "darkgreen", fontface = "bold") +
+
+labs(title = "Fig A1: Time x Location Interaction Plot",
+       y = "Estimated Score", x = "Location") +
+theme_minimal()
+
+```
+
+We investigated the interaction between the two factors through an interaction plot which can be shown in the Appendix Figure 1. In Fig A1, the colored lines (AM = red, PM = blue) represent the estimated mean score for each location across times of day. Since these two lines are not perfectly parallel, there is an interaction present between factors 'Time' and 'Location' on the score. For example, the effect of particular location (i.e., Student Union) on the score varies from time (AM) to time (PM). Interaction is significantly pronounced through Student Union, i.e., slightly higher score in PM than AM.  
+
+
+```{r}
+#----------------------------------------------------
+# Tukey's Test for NonAdditivity
+#----------------------------------------------------
+
+score_add <- aov(Score ~ Time + Location, data = study)
+study$q3 <- fitted(score_add)^2
+score_tukey_add <- aov(Score ~ Time + Location + q3, data = study)
+anova(score_tukey_add)
+```
+
+The above test confirms that the interaction effect is significant, as also suggested by the (diagnostic) interaction plot. 
+
+
+## Step 4: Model Assumption Check
+
+
+```{r}
+#-----------------------------------------------
+# Normal plot (Appendix Figure 2) and Residuals vs. Fitted (Appendix Figure 3)
+#-----------------------------------------------
+
+resid_values <- resid(score_model_red)
+fitted_values <- fitted(score_model_red)
+
+par(mfrow = c(1, 2))
+
+# Q-Q Plot for Normality
+qqnorm(resid_values, main = "Fig A2: Q-Q Plot of Residuals")
+qqline(resid_values, col = "red", lwd = 2)
+
+# Residuals vs. Fitted 
+plot(fitted_values, resid_values,
+     main = "Fig A3: Residuals vs Fitted Values",
+     xlab = "Fitted Values", ylab = "Residuals",
+     pch = 20, col = "steelblue")
+abline(h = 0, col = "red", lwd = 2)
+
+```
+
+
+Q-Q Plot of Residuals:
+
+From Fig A2. Q-Q Plot of Residuals we can see that most of the residual points are wrapped well across the reference line. Some observations are deviated which is common for a large dataset. Only one observation on the top appears to be an outlier but not at a significant margin. Thus, we can conclude that the normality assumption is reasonably satisfied for the residuals.
+  
+  
+Residuals vs Fitted Plot: 
+
+From Fig A3. Residuals vs Fitted Plot we can observe that the residuals appear randomly scattered around the horizontal line at zero. Also, there is no clear pattern or shape forming and no monotonous increasing or decreasing trend is observed. Therefore, the homoscedasticity (constant variance) assumption seems to be satisfied. We can also see that the higher predicted values near $7$ and $8$, there are some points showing high variance than the other fitted scores.
+  
+
+
+
+```{r}
+#---------------------------------------------------
+# Residual boxplots (Appendix Figures 4, 5, 6)
+#--------------------------------------------------
+
+par(mfrow = c(1, 3), mar = c(5, 4, 4, 2) + 0.1)
+resid_values <- resid(score_model_red)
+
+boxplot(resid_values ~ study$Time,
+        main = "Fig A4: Residuals by Time",
+        ylab = "Residuals",
+        xlab = "Time")
+
+boxplot(resid_values ~ study$Location,
+        main = "Fig A5: Residuals by Location",
+        ylab = "Residuals",
+        xlab = "Location")
+
+interaction_group <- interaction(study$Time, study$Location)
+
+boxplot(resid_values ~ interaction_group,
+        main = "Fig A6: Residuals by Time x Location",
+        ylab = "Residuals",
+        xlab = "Time x Location")
+
+```
+
+
+From Appendix Figure 4 we can observe that both AM and PM data have similar spread, so the variance is constant across 'Time'. the second plot in Fig A5 shows that the Common Room and Main Library have similar variance. However, the Student Union has a larger spread indicating high variance. In Fig A6, both AM.Student Union and PM.Student Union show larger spread and therefore may have more outliers which can be a potential source for heteroscedasticity. 
+
+
+## Section 5: Tukey-adjusted confidence intervals to make recommendations
+```{r}
+#--------------------------------------------------
+# Tukey-adjusted confidence intervals
+#--------------------------------------------------
+
+library(emmeans)
+
+emm <- emmeans(score_model_red, ~ Location)
+summary(pairs(emm, adjust = "tukey"))
+
+
+emm <- emmeans(score_model_red, ~ Time)
+summary(pairs(emm, adjust = "tukey"))
+
+
+emm <- emmeans(score_model_red, ~ Time:Location)
+summary(pairs(emm, adjust = "tukey"))
+```
+
+  - Common Room is significantly quieter (lower distraction) than the others.
+  
+  - Student Union is the loudest
+  
+  - AM is a quieter/better time to go for studying in the campus.
+  
+  - AM Common Room is the quietest interaction combination (all point estimates are negative). Not significantly quieter than PM Common Room. 
